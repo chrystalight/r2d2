@@ -79,6 +79,13 @@ unsigned long previousMillis = 0;  // will store last time LED was updated
 //
 
 void setup() {
+  delay(3000);
+  Serial.begin(9600);
+  Serial.write(CMD);
+  Serial.write(0x38);
+  Serial.write(CMD);
+  Serial.write(0x34);
+  Serial.write(0x01);
 
   //***MAIN MOTOR DRIVER SETUP**
   Serial.begin(9600);
