@@ -1,68 +1,61 @@
-#include <Arduino.h>
 #include <FastLED.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <SoftwareSerial.h>
 
-#define BUTTON1_PIN  12  // Adjust to your wiring
-#define BUTTON2_PIN  14  // Adjust to your wiring
-#define POT_PIN      34  // ADC pin for potentiometer
-#define LED_PIN      27  // LED strip data pin
-#define NUM_LEDS     30  // Adjust based on your LED strip
+#define BUTTON1_PIN  52  // Adjust to your wiring
+#define BUTTON2_PIN  48  // Adjust to your wiring
 
+#define POT_PIN      A1  // ADC pin for potentiometer
+#define LED_PIN      7  // LED strip data pin
+#define NUM_LEDS     5  // Adjust based on your LED strip
+
+SoftwareSerial BTSerial(10, 11);
 CRGB leds[NUM_LEDS];
-BLEServer *pServer = nullptr;
-BLECharacteristic *pCharacteristic = nullptr;
-bool deviceConnected = false;
-
-// BLE Service and Characteristic UUIDs
-#define SERVICE_UUID        "12345678-1234-5678-1234-56789abcdef0"
-#define CHARACTERISTIC_UUID "abcdef01-1234-5678-1234-56789abcdef0"
-
-class MyServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-        deviceConnected = true;
-    }
-    void onDisconnect(BLEServer* pServer) {
-        deviceConnected = false;
-    }
-};
-
 void setup() {
-    Serial.begin(115200);
-    pinMode(BUTTON1_PIN, INPUT_PULLUP);
-    pinMode(BUTTON2_PIN, INPUT_PULLUP);
-    pinMode(POT_PIN, INPUT);
+  Serial.begin(9600);
+  BTSerial.begin(9600);
 
-    FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-    FastLED.clear();
-    FastLED.show();
+  pinMode(BUTTON1_PIN, INPUT);
+  pinMode(BUTTON2_PIN, INPUT);
+  pinMode(POT_PIN, INPUT);
 
-    // Initialize BLE
-    BLEDevice::init("ESP32C_UserModule");
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-    pCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID,
-        BLECharacteristic::PROPERTY_READ   |
-        BLECharacteristic::PROPERTY_WRITE  |
-        BLECharacteristic::PROPERTY_NOTIFY
-    );
-    pCharacteristic->addDescriptor(new BLE2902());
-    pService->start();
-    pServer->getAdvertising()->start();
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.clear();
+  FastLED.show();
 }
 
 void loop() {
-    int button1State = digitalRead(BUTTON1_PIN);
-    int button2State = digitalRead(BUTTON2_PIN);
-    int potValue = analogRead(POT_PIN);
-    int ledCount = map(potValue, 0, 4095, 0, NUM_LEDS);
-    
-    // Update LED strip
-    for (int i = 0; i < NUM_LEDS; i++) {
+  int button1State = digitalRead(BUTTON1_PIN);
+  int button2State = digitalRead(BUTTON2_PIN);
+  int potValue = 1022 - analogRead(POT_PIN);
+  int ledCount;
+  
+  if (potValue < 200) {
+    ledCount = 1; 
+  } else if (potValue >= 200 && potValue < 820) {
+    ledCount = 2;
+  } else if (potValue >= 820 && potValue < 950) {
+    ledCount = 3;
+  } else if (potValue >= 950 && potValue < 1000) {
+    ledCount = 4;
+  } else {
+    ledCount = 5;
+  }
+
+  if (button1State == HIGH) { // Button pressed
+    Serial.println("Button 1 Pressed!");
+  } else {
+    Serial.println("Button 1 Not Pressed");
+  }
+
+  if (button2State == HIGH) { // Button pressed
+    Serial.println("Button 2 Pressed!");
+  } else {
+    Serial.println("Button 2 Not Pressed");
+  }
+
+  Serial.println(potValue);
+
+  for (int i = 0; i < NUM_LEDS; i++) {
         if (i < ledCount) {
             leds[i] = CRGB::Blue;
         } else {
@@ -70,13 +63,9 @@ void loop() {
         }
     }
     FastLED.show();
-    
-    // Transmit data via BLE
-    if (deviceConnected) {
-        String data = String(button1State) + "," + String(button2State) + "," + String(potValue);
-        pCharacteristic->setValue(data.c_str());
-        pCharacteristic->notify();
-    }
-    
-    delay(100);
+
+  String data = String(button1State) + "," + String(button2State) + "," + String(potValue);
+  BTSerial.println(data);
+
+  delay(50);
 }
